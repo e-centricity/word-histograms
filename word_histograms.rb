@@ -6,11 +6,59 @@ require 'pathname'
 require 'pdf-reader'
 require 'pry'
 
+#TODO: package separately for visualization strategy
+require 'graphviz'
+require 'optparse'
+require 'hirb'
+
+$cli_options = {"display" => 'WordGraph'} #.with_indifferent_access
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: bundle exec ruby word_histograms.rb [-v] [-o PrintAll|CompareNamesToConfig] path/to/file_with_pdf_links.txt keywords.yaml"
+
+  opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
+    $cli_options["verbose"] = v
+  end
+
+  opts.on("-o", "--display DISPLAY", "display") do |d|
+    $cli_options["display"] = d
+  end
+
+  opts.on("-C", "--config-path CONFIG_PATH", "yaml file path relative to root") do |c|
+    $cli_options["config-path"] = c
+  end
+end.parse!
+
+
 class WordHistograms
+
+  class WordGraph < Proc
+    def self.new(*)
+      super() do |io, hits, opts|  
+        binding.pry
+        io.puts "hello"
+      end
+    end
+  end
+
+  class PrintAll < Proc
+    def self.new(*)
+      Hirb.enable :pager=>false, :formatter=>false 
+
+      super() do |io, hits, opts|  
+        for k,count in hits
+          io.puts <<-END 
+              k:   #{k}
+          END
+          io.puts Hirb::Helpers::AutoTable.render([k,count],opts)
+        end
+      end
+    end
+  end
 
   def initialize(path_to_prose_with_pdf_links, path_to_keywords)
     @pdf_paths = extract_and_download_pdfs(path_to_prose_with_pdf_links)
-    if ENV['VERBOSE']
+    if $cli_options["verbose"]
       STDOUT.puts("no more PDFs to download.")
     end
 
@@ -28,7 +76,7 @@ class WordHistograms
       end
     end
 
-    if ENV['VERBOSE']
+    if $cli_options["verbose"]
       STDOUT.puts("keywords extracted: #{@keywords.inspect}")
     end
   end
@@ -47,13 +95,13 @@ class WordHistograms
     @counts_for_each_block = {} #only used for verbose
     for path in @pdf_paths
       process_one!(path) do |block_number,counts|
-        if ENV['VERBOSE']
+        if $cli_options["verbose"]
           @counts_for_each_block[path.to_s+":#{block_number}"] = counts
         end
       end
     end
     @hits.freeze
-    if ENV['VERBOSE']
+    if $cli_options["verbose"]
       for (path_and_block, counts) in @counts_for_each_block.sort
         STDOUT.puts "#{path_and_block}: #{counts.to_json}"
       end
@@ -62,7 +110,7 @@ class WordHistograms
   end
 
 
-  def histograms
+  def hits
     validate_populated
     @hits
   end
@@ -82,12 +130,11 @@ class WordHistograms
 
       transaction_lite do |counts,error_master|
         for keyword, variations in @keywords
-        binding.pry if path.to_s.include?("RTC")
           valid_variations = variations.reject{|v| @document_rules[path.basename.to_s] && Array(@document_rules[path.basename.to_s]['skip']).include?(v) }
 
           error_master.details = [path, keyword]
           #error_master.verbose = lambda{ }
-          if ENV['VERBOSE']
+          if $cli_options["verbose"]
             STDOUT.puts("#{path},#{keyword}, block_number #{block_number}, #{counts.values.inspect}")
           end
           found = string.scan(/#{valid_variations.join("|")}/i)  #case insensitive
@@ -205,11 +252,14 @@ private
 end
 
 if __FILE__ == $PROGRAM_NAME
-  if(ARGV[0].nil? || ARGV[1].nil?)
-    raise "USAGE:      VERBOSE=true DEBUG=true bundle exec ruby word_histograms.rb list_of_pdf_links.txt keywords.yaml"
-  end
   obj = WordHistograms.new(ARGV[0],ARGV[1])
   obj.process_all!
-  #TODO: make it a
-  STDOUT.puts(obj.histograms.to_yaml)
+
+  opts = $cli_options.dup
+  io = StringIO.new
+
+  #constantize, not available without activesupport
+  eval("WordHistograms::#{opts["display"]}").new.(io,obj.hits, opts)
+  io.rewind
+  STDOUT.puts(io.read)
 end
