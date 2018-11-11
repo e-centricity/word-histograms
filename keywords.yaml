@@ -1,88 +1,94 @@
 ---
-safety:
-  - safety
-  - safe
-  - accident
-  - secure
-  - security
+documents:
+  "regional-plan": 
+    skip: regional
+  "RTC-TIBP-full.pdf?":
+    skip: regional
+keywords:
+  safety:
+    - safety
+    - safe
+    - accident
+    - secure
+    - security
 
-intelligent:
-  - intelligent
-  - intelligent transportation system
-  - its
-  - telecommunication
-  - communication
-  - network
-  - radio
-  - fiber
-  - wire
-  - conduit
-  - sensor
-  - device
+  intelligent:
+    - intelligent
+    - intelligent transportation system
+    - its
+    - telecommunication
+    - communication
+    - network
+    - radio
+    - fiber
+    - wire
+    - conduit
+    - sensor
+    - device
 
-maintenance:
-  - maintenance
-  - upkeep
+  maintenance:
+    - maintenance
+    - upkeep
 
-efficiency: 
-  - efficiency
-  - move
-  - movement
+  efficiency: 
+    - efficiency
+    - move
+    - movement
 
-mobility:
-  - mobility
-  - immobile
-  - mobile
+  mobility:
+    - mobility
+    - immobile
+    - mobile
 
-elderly: 
-  - elderly
-  - paratransit
-  - disabled
-  - rural
+  elderly: 
+    - elderly
+    - paratransit
+    - disabled
+    - rural
 
-environment:
-  - environment
-  - air quality
+  environment:
+    - environment
+    - air quality
 
-congestion:
-  - congestion
-  - decongestion
+  congestion:
+    - congestion
+    - decongestion
 
-regional:
-  - regional
-  - connectivity
-  - rapid transit
-  - mass transit
-  - guided rail
-  - light rail
-  - heavy rail
-  - fixed
+  regional:
+    - regional
+    - connectivity
+    - rapid transit
+    - mass transit
+    - guided rail
+    - light rail
+    - heavy rail
+    - fixed
 
-land use:
-  - land use
-  - density
-  - planning
+  land use:
+    - land use
+    - density
+    - planning
 
-walking:
-  - walking
-  - cycling
-  - bike
-  - bike lanes
+  walking:
+    - walking
+    - cycling
+    - bike
+    - bike lanes
 
-multimodal:
-  - multimodal
+  multimodal:
+    - multimodal
 
-public transit:
-  - public transit
+  public transit:
+    - public transit
 
-complete streets:
-  - complete streets
-  - turn-outs
-  - curbs
-  - curb side
-  - sidewalks
-  - medians
-  - designated lane
+  complete streets:
+    - complete streets
+    - turn-outs
+    - curbs
+    - curb side
+    - sidewalks
+    - medians
+    - designated lane
 
-access:
-  - access
+  access:
+    - access

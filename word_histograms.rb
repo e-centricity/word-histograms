@@ -14,11 +14,12 @@ class WordHistograms
       STDOUT.puts("no more PDFs to download.")
     end
 
-    @keywords = YAML.load_file(path_to_keywords)
+    hsh = YAML.load_file(path_to_keywords)
+    @keywords = hsh["keywords"]
+    @document_rules = hsh["documents"]
 
     #validate keywords
-    raw = File.read(path_to_keywords)
-    if raw[/A-Z/]
+    if @keywords.to_json[/A-Z/]
       raise "keywords must all be lowercase. Keyword search matches BOTH capital and lowercase"
     end
     @keywords.each do |k,vs| 
@@ -31,8 +32,17 @@ class WordHistograms
       STDOUT.puts("keywords extracted: #{@keywords.inspect}")
     end
   end
+  def validate_document_rules
+    @document_rules.each do |basename, drule|
+      if !get_path_to_txt(basename).exist?
+        raise "the document rules in keywords.yaml seem to be incorrect; no known file: #{basename}"
+      end
+    end
+  end
 
   def process_all!
+    validate_document_rules
+
     @hits = Hash.new{|h,k| h[k] = 0}
     @counts_for_each_block = {} #only used for verbose
     for path in @pdf_paths
@@ -66,18 +76,21 @@ class WordHistograms
       block_number += 1
 
       begin 
-        string += io.gets until (string.length > 5000 || io.eof?)
+        string += io.gets until (string.length > 1000 || io.eof?)
       rescue
       end
 
       transaction_lite do |counts,error_master|
         for keyword, variations in @keywords
+        binding.pry if path.to_s.include?("RTC")
+          valid_variations = variations.reject{|v| @document_rules[path.basename.to_s] && Array(@document_rules[path.basename.to_s]['skip']).include?(v) }
+
           error_master.details = [path, keyword]
           #error_master.verbose = lambda{ }
           if ENV['VERBOSE']
             STDOUT.puts("#{path},#{keyword}, block_number #{block_number}, #{counts.values.inspect}")
           end
-          found = string.scan(/#{variations.join("|")}/i)
+          found = string.scan(/#{valid_variations.join("|")}/i)  #case insensitive
           if found.any?
             counts[keyword]
             counts[keyword] += found.length
@@ -176,13 +189,13 @@ private
       end
     end
 
-    links.map{|basename,url| get_text basename }
+    links.map{|basename,url| get_path_to_txt basename }
   end
 
 
   def cleaned_exists?(basename); CLEANED_DIR.join(basename).exist? end
 
-  def get_text(basename)
+  def get_path_to_txt(basename)
     if cleaned_exists?(basename)
       CLEANED_DIR.join basename
     else
