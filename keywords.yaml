@@ -1,0 +1,88 @@
+---
+safety:
+  - safety
+  - safe
+  - accident
+  - secure
+  - security
+
+intelligent:
+  - intelligent
+  - intelligent transportation system
+  - its
+  - telecommunication
+  - communication
+  - network
+  - radio
+  - fiber
+  - wire
+  - conduit
+  - sensor
+  - device
+
+maintenance:
+  - maintenance
+  - upkeep
+
+efficiency: 
+  - efficiency
+  - move
+  - movement
+
+mobility:
+  - mobility
+  - immobile
+  - mobile
+
+elderly: 
+  - elderly
+  - paratransit
+  - disabled
+  - rural
+
+environment:
+  - environment
+  - air quality
+
+congestion:
+  - congestion
+  - decongestion
+
+regional:
+  - regional
+  - connectivity
+  - rapid transit
+  - mass transit
+  - guided rail
+  - light rail
+  - heavy rail
+  - fixed
+
+land use:
+  - land use
+  - density
+  - planning
+
+walking:
+  - walking
+  - cycling
+  - bike
+  - bike lanes
+
+multimodal:
+  - multimodal
+
+public transit:
+  - public transit
+
+complete streets:
+  - complete streets
+  - turn-outs
+  - curbs
+  - curb side
+  - sidewalks
+  - medians
+  - designated lane
+
+access:
+  - access

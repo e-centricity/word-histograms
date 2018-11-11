@@ -13,26 +13,39 @@ class WordHistograms
     if ENV['VERBOSE']
       STDOUT.puts("no more PDFs to download.")
     end
-    @keywords = extract_keywords(path_to_keywords)
+
+    @keywords = YAML.load_file(path_to_keywords)
+
+    #validate keywords
+    raw = File.read(path_to_keywords)
+    if raw[/A-Z/]
+      raise "keywords must all be lowercase. Keyword search matches BOTH capital and lowercase"
+    end
+    @keywords.each do |k,vs| 
+      if !vs.include?(k) 
+        raise "keyword variations for #{k} should include #{k} -- we don't automatically include it."
+      end
+    end
+
     if ENV['VERBOSE']
       STDOUT.puts("keywords extracted: #{@keywords.inspect}")
     end
   end
 
   def process_all!
-    @counts = Hash.new{|h,k| h[k] = 0}
-    @counts_for_each_page = {} #only used for verbose
+    @hits = Hash.new{|h,k| h[k] = 0}
+    @counts_for_each_block = {} #only used for verbose
     for path in @pdf_paths
-      process_one!(path) do |counts|
+      process_one!(path) do |block_number,counts|
         if ENV['VERBOSE']
-          @counts_for_each_page[path] = counts
+          @counts_for_each_block[path.to_s+":#{block_number}"] = counts
         end
       end
     end
-    @counts.freeze
+    @hits.freeze
     if ENV['VERBOSE']
-      for path, counts in @counts_for_each_page
-        STDOUT.puts "#{path}: #{counts.to_json}"
+      for (path_and_block, counts) in @counts_for_each_block.sort
+        STDOUT.puts "#{path_and_block}: #{counts.to_json}"
       end
     end
     nil
@@ -41,28 +54,41 @@ class WordHistograms
 
   def histograms
     validate_populated
-    @counts
+    @hits
   end
 
 
   def process_one!(path)
-    transaction_lite do |counts,error_master|
-      string = path.read
-      for keyword in @keywords
-        error_master.details = [path, keyword]
-        #error_master.verbose = lambda{ }
-        if ENV['VERBOSE']
-          STDOUT.puts("#{path},#{keyword}")
+    block_number = 0
+    io = path.open("r")
+    until io.eof?
+      string = ""
+      block_number += 1
+
+      begin 
+        string += io.gets until (string.length > 5000 || io.eof?)
+      rescue
+      end
+
+      transaction_lite do |counts,error_master|
+        for keyword, variations in @keywords
+          error_master.details = [path, keyword]
+          #error_master.verbose = lambda{ }
+          if ENV['VERBOSE']
+            STDOUT.puts("#{path},#{keyword}, block_number #{block_number}, #{counts.values.inspect}")
+          end
+          found = string.scan(/#{variations.join("|")}/i)
+          if found.any?
+            counts[keyword]
+            counts[keyword] += found.length
+            break
+          end
         end
-        found = string.scan(keyword)
-        counts[keyword]
-        counts[keyword] += found.length
-      end
 
-      if block_given?
-        yield(counts)
+        if block_given?
+          yield(counts)
+        end
       end
-
     end
     nil
   end
@@ -72,8 +98,10 @@ class WordHistograms
     error_master = OpenStruct.new #TODO: gather information from the context as a hash
     yield(tmp_counts,error_master)
     for k,count in tmp_counts
-      @counts[k]
-      @counts[k] += count
+      @hits[k]
+      if count > 0
+        @hits[k] += 1
+      end
     end
     nil
   rescue Exception => e
@@ -85,8 +113,8 @@ class WordHistograms
 
 private
   def validate_populated
-    if @counts.nil?
-      raise "please call process_all! before attempting to use this."
+    if @hits.nil?
+      raise "please call process_all! before attempting to use the hit results."
     end
   end
 
@@ -106,15 +134,15 @@ private
       next if cleaned_exists?(basename)
       if ENV['REFRESH_PDFS']
       else
-        if pdfdir.join(basename).exist? && pdfdir.join(basename).size == 0
-          STDERR.puts "Warning: #{pdfdir.join(basename).basename} is empty, but exists. Attempting to download again. If requires sign-in, please manually download. #{link}"
-        elsif pdfdir.join(basename).exist?
+        if PDF_DIR.join(basename).exist? && PDF_DIR.join(basename).size == 0
+          STDERR.puts "Warning: #{PDF_DIR.join(basename).basename} is empty, but exists. Attempting to download again. If requires sign-in, please manually download. #{link}"
+        elsif PDF_DIR.join(basename).exist?
           next
         end
       end
 
       #TODO: only overwrite if download is successful. Does curl automatically do this?
-      open(pdfdir+basename, 'wb') do |file|
+      open(PDF_DIR+basename, 'wb') do |file|
         file << open(link).read
       end
     end
@@ -123,13 +151,13 @@ private
       next if cleaned_exists?(basename)
       if ENV['REFRESH_TXTS']
       else
-        if txtdir.join(basename).exist? && txtdir.join(basename).size == 0
-            STDERR.puts "Warning: #{txtdir.join(basename).basename} is empty, but exists. Attempting to process to TXT again. If consistently failing, please create text manually. #{link}"
-        elsif txtdir.join(basename).exist?
+        if TXT_DIR.join(basename).exist? && TXT_DIR.join(basename).size == 0
+            STDERR.puts "Warning: #{TXT_DIR.join(basename).basename} is empty, but exists. Attempting to process to TXT again. If consistently failing, please create text manually. #{link}"
+        elsif TXT_DIR.join(basename).exist?
             next
         end
       end
-      io = open(pdfdir.join(basename).to_s)
+      io = open(PDF_DIR.join(basename).to_s)
       begin
         reader = PDF::Reader.new(io)
         string = "" 
@@ -143,7 +171,7 @@ private
       rescue
         STDERR.puts("failed to process entire PDF. continuing: #{basename}")
       end
-      open(txtdir+basename, 'w+') do |file|
+      open(TXT_DIR+basename, 'w+') do |file|
         file << string
       end
     end
@@ -151,9 +179,6 @@ private
     links.map{|basename,url| get_text basename }
   end
 
-  def extract_keywords(path_to_keywords)
-    File.read(path_to_keywords).split(/[\W{2,20}|,]/).reject{|candidate| !candidate[/\w/] }
-  end
 
   def cleaned_exists?(basename); CLEANED_DIR.join(basename).exist? end
 
@@ -168,7 +193,7 @@ end
 
 if __FILE__ == $PROGRAM_NAME
   if(ARGV[0].nil? || ARGV[1].nil?)
-    raise "USAGE:      VERBOSE=true DEBUG=true bundle exec ruby word_histograms.rb list_of_pdf_links.txt keywords.txt"
+    raise "USAGE:      VERBOSE=true DEBUG=true bundle exec ruby word_histograms.rb list_of_pdf_links.txt keywords.yaml"
   end
   obj = WordHistograms.new(ARGV[0],ARGV[1])
   obj.process_all!
