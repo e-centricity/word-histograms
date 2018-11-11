@@ -1,27 +1,39 @@
 require 'yaml'
 require 'open-uri'
+require 'ostruct'
 require 'pathname'
-#require 'pdf-reader'
-require 'origami' #more flexible than pdf-reader
+require 'pdf-reader'
 require 'pry'
 
-# Force data extraction, even for invalid FlateDecode streams.
-Origami::OPTIONS[:ignore_zlib_errors] = true
-Origami::OPTIONS[:ignore_png_errors] = true
-
 class WordHistograms
-  include Origami
+
   def initialize(path_to_prose_with_pdf_links, path_to_keywords)
     @pdf_paths = extract_and_download_pdfs(path_to_prose_with_pdf_links)
+    if ENV['VERBOSE']
+      STDOUT.puts("no more PDFs to download.")
+    end
     @keywords = extract_keywords(path_to_keywords)
+    if ENV['VERBOSE']
+      STDOUT.puts("keywords extracted: #{@keywords.inspect}")
+    end
   end
 
   def process_all!
     @counts = Hash.new{|h,k| h[k] = 0}
+    @counts_for_each_page = {} #only used for verbose
     for path in @pdf_paths
-      process_one!(path)
+      process_one!(path) do |counts|
+        if ENV['VERBOSE']
+          @counts_for_each_page[path] = counts
+        end
+      end
     end
     @counts.freeze
+    if ENV['VERBOSE']
+      for path, counts in @counts_for_each_page
+        STDOUT.puts "#{path}: #{counts.to_json}"
+      end
+    end
     nil
   end
 
@@ -33,41 +45,51 @@ class WordHistograms
 
 
   def process_one!(path)
-    transaction_lite(path) do |counts|
-      #io = open(path.to_s)
-      #reader = PDF::Reader.new(io)
-      reader = PDF.read(path.to_s, lazy: true)
-      reader.each_page do |page|
-        #string = page.text
-        string = page.to_s
+    transaction_lite do |counts,error_master|
+      io = open(path.to_s)
+      reader = PDF::Reader.new(io)
+      reader.pages.each do |page|
+        string = page.text
         for keyword in @keywords
-          @current_keyword = keyword
-          @found = string.scan(keyword)
+          error_master.path = path
+          error_master.keyword = keyword
+          error_master.page = page
+          if ENV['VERBOSE']
+            STDOUT.puts("#{path},#{keyword}, #{page.inspect}")
+          end
+          found = string.scan(keyword)
           counts[keyword]
-          counts[keyword] += @found.length
+          counts[keyword] += found.length
         end
       end
+
+      if block_given?
+        yield(counts)
+      end
+
     end
   end
 
-  def transaction_lite(path)
+  def transaction_lite
     tmp_counts = Hash.new{|h,k| h[k] = 0}
-    yield(tmp_counts)
-    #transactions-lite
+    error_master = OpenStruct.new #TODO: gather information from the context as a hash
+    yield(tmp_counts,error_master)
     for k,count in tmp_counts
       @counts[k]
       @counts[k] += count
     end
     nil
   rescue Exception => e
-    STDERR.puts("Error: #{path}, #{@current_keyword}, #{@found}")
-    binding.pry
+    if ENV['DEBUG']
+      binding.pry
+    end
+    STDERR.puts("Error: #{error_master.inspect}, #{e.message}")
   end
 
 private
   def validate_populated
     if @counts.nil?
-        raise "please call process_all! before attempting to use this."
+      raise "please call process_all! before attempting to use this."
     end
   end
 
@@ -99,11 +121,14 @@ private
   end
 
   def extract_keywords(path_to_keywords)
-    File.read(path_to_keywords).split(/[\W{2,20}|,]/)
+    File.read(path_to_keywords).split(/[\W{2,20}|,]/).reject{|candidate| !candidate[/\w/] }
   end
 end
 
 if __FILE__ == $PROGRAM_NAME
+  if(ARGV[0].nil? || ARGV[1].nil?)
+    raise "USAGE:      VERBOSE=true DEBUG=true bundle exec ruby word_histograms.rb list_of_pdf_links.txt keywords.txt"
+  end
   obj = WordHistograms.new(ARGV[0],ARGV[1])
   obj.process_all!
   #TODO: make it a

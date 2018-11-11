@@ -1,6 +1,7 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    Ascii85 (1.0.3)
     actionpack (5.2.1)
       actionview (= 5.2.1)
       activesupport (= 5.2.1)
@@ -21,6 +22,7 @@ GEM
       i18n (>= 0.7, < 2)
       minitest (~> 5.1)
       tzinfo (~> 1.1)
+    afm (0.2.2)
     bindex (0.5.0)
     builder (3.2.3)
     byebug (10.0.2)
@@ -30,6 +32,7 @@ GEM
     crass (1.0.4)
     erubi (1.7.1)
     fastest-csv (0.0.4)
+    hashery (2.1.2)
     hirb (0.7.3)
     i18n (1.1.1)
       concurrent-ruby (~> 1.0)
@@ -41,8 +44,12 @@ GEM
     minitest (5.11.3)
     nokogiri (1.8.5)
       mini_portile2 (~> 2.3.0)
-    origami (2.1.0)
-      colorize (~> 0.7)
+    pdf-reader (2.1.0)
+      Ascii85 (~> 1.0.0)
+      afm (~> 0.2.1)
+      hashery (~> 2.0)
+      ruby-rc4
+      ttfunk
     pry (0.10.4)
       coderay (~> 1.1.0)
       method_source (~> 0.8.1)
@@ -64,9 +71,11 @@ GEM
       rake (>= 0.8.7)
       thor (>= 0.19.0, < 2.0)
     rake (12.3.1)
+    ruby-rc4 (0.1.5)
     slop (3.6.0)
     thor (0.20.3)
     thread_safe (0.3.6)
+    ttfunk (1.5.1)
     tzinfo (1.2.5)
       thread_safe (~> 0.1)
     web-console (3.7.0)
@@ -83,7 +92,7 @@ DEPENDENCIES
   colorize
   fastest-csv
   hirb
-  origami
+  pdf-reader
   pry-nav
   web-console (~> 3.7)
 
