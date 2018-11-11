@@ -1,4 +1,5 @@
 require 'yaml'
+require 'json'
 require 'open-uri'
 require 'ostruct'
 require 'pathname'
@@ -46,21 +47,16 @@ class WordHistograms
 
   def process_one!(path)
     transaction_lite do |counts,error_master|
-      io = open(path.to_s)
-      reader = PDF::Reader.new(io)
-      reader.pages.each do |page|
-        string = page.text
-        for keyword in @keywords
-          error_master.path = path
-          error_master.keyword = keyword
-          error_master.page = page
-          if ENV['VERBOSE']
-            STDOUT.puts("#{path},#{keyword}, #{page.inspect}")
-          end
-          found = string.scan(keyword)
-          counts[keyword]
-          counts[keyword] += found.length
+      string = path.read
+      for keyword in @keywords
+        error_master.details = [path, keyword]
+        #error_master.verbose = lambda{ }
+        if ENV['VERBOSE']
+          STDOUT.puts("#{path},#{keyword}")
         end
+        found = string.scan(keyword)
+        counts[keyword]
+        counts[keyword] += found.length
       end
 
       if block_given?
@@ -68,6 +64,7 @@ class WordHistograms
       end
 
     end
+    nil
   end
 
   def transaction_lite
@@ -93,35 +90,79 @@ private
     end
   end
 
-  PDF_DIR = 'tmp/pdfs'
+  PDF_DIR = Pathname.new 'tmp/pdfs'
+  FileUtils.mkdir_p(PDF_DIR)
+  TXT_DIR = Pathname.new 'tmp/txt'
+  FileUtils.mkdir_p(TXT_DIR)
+  CLEANED_DIR = Pathname.new('cleaned/txt')
+  raise "cleaned should be in git" unless CLEANED_DIR.exist?
+
   def extract_and_download_pdfs(path_to_prose_with_pdf_links)
-    FileUtils.mkdir_p(PDF_DIR)
-    tmpdir = Pathname.new(PDF_DIR)
-    #regexp = /(^$)|(^(http|https):\/\/[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(([0-9]{1,5})?\/.*)?$)/ix
-    #regexp = /^((http[s]?|ftp):\/)?\/?([^:\/\s]+)((\/\w+)*\/)([\w\-\.]+[^#?\s]+)(.*)?(#[\w\-]+)?$/
-    regexp = /http[^\s\n]*/
     prose = File.read(path_to_prose_with_pdf_links)
-    links = prose.scan(regexp).inject({}){|acc,l| 
+    links = prose.scan(/http[^\s\n]*/).inject({}){|acc,l| 
         acc[File.basename(l)] = l; acc 
     }
     for basename, link in links
-      if ENV['REFRESH']
+      next if cleaned_exists?(basename)
+      if ENV['REFRESH_PDFS']
       else
-        if tmpdir.join(basename).size == 0
-          STDERR.puts "Warning: #{path.basename} is empty, but exists. Attempting to download again. If requires sign-in, please manually download. #{link}"
-        elsif tmpdir.join(basename).exist?
+        if pdfdir.join(basename).exist? && pdfdir.join(basename).size == 0
+          STDERR.puts "Warning: #{pdfdir.join(basename).basename} is empty, but exists. Attempting to download again. If requires sign-in, please manually download. #{link}"
+        elsif pdfdir.join(basename).exist?
           next
         end
       end
-      open(tmpdir+basename, 'wb') do |file|
+
+      #TODO: only overwrite if download is successful. Does curl automatically do this?
+      open(pdfdir+basename, 'wb') do |file|
         file << open(link).read
       end
     end
-    links.map{|basename,url| tmpdir+basename }
+
+    for basename, link in links
+      next if cleaned_exists?(basename)
+      if ENV['REFRESH_TXTS']
+      else
+        if txtdir.join(basename).exist? && txtdir.join(basename).size == 0
+            STDERR.puts "Warning: #{txtdir.join(basename).basename} is empty, but exists. Attempting to process to TXT again. If consistently failing, please create text manually. #{link}"
+        elsif txtdir.join(basename).exist?
+            next
+        end
+      end
+      io = open(pdfdir.join(basename).to_s)
+      begin
+        reader = PDF::Reader.new(io)
+        string = "" 
+        reader.pages.each do |page|
+          begin
+            string += page.text 
+          rescue Exception
+            STDERR.puts("failed to process page. continuing: #{page.inspect} from #{basename}")
+          end
+        end 
+      rescue
+        STDERR.puts("failed to process entire PDF. continuing: #{basename}")
+      end
+      open(txtdir+basename, 'w+') do |file|
+        file << string
+      end
+    end
+
+    links.map{|basename,url| get_text basename }
   end
 
   def extract_keywords(path_to_keywords)
     File.read(path_to_keywords).split(/[\W{2,20}|,]/).reject{|candidate| !candidate[/\w/] }
+  end
+
+  def cleaned_exists?(basename); CLEANED_DIR.join(basename).exist? end
+
+  def get_text(basename)
+    if cleaned_exists?(basename)
+      CLEANED_DIR.join basename
+    else
+      TXT_DIR.join basename
+    end
   end
 end
 
