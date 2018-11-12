@@ -1,3 +1,9 @@
+GIT
+  remote: https://github.com/jdar/ruby-graphviz.git
+  revision: 3bcdc6ec6fabff4e734eb140e9f328ffeb088906
+  specs:
+    ruby-graphviz (1.2.3)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -32,8 +38,6 @@ GEM
     crass (1.0.4)
     erubi (1.7.1)
     fastest-csv (0.0.4)
-    graphviz (1.1.0)
-      process-pipeline
     hashery (2.1.2)
     hirb (0.7.3)
     i18n (1.1.1)
@@ -52,9 +56,6 @@ GEM
       hashery (~> 2.0)
       ruby-rc4
       ttfunk
-    process-group (1.1.0)
-    process-pipeline (1.0.1)
-      process-group
     pry (0.10.4)
       coderay (~> 1.1.0)
       method_source (~> 0.8.1)
@@ -96,10 +97,10 @@ DEPENDENCIES
   byebug
   colorize
   fastest-csv
-  graphviz
   hirb
   pdf-reader
   pry-nav
+  ruby-graphviz!
   web-console (~> 3.7)
 
 BUNDLED WITH

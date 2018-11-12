@@ -1,7 +1,8 @@
 source 'https://rubygems.org'
 
 gem 'pdf-reader'
-gem 'graphviz'
+#gem 'graphviz'
+gem "ruby-graphviz", git: "https://github.com/jdar/ruby-graphviz.git"
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console

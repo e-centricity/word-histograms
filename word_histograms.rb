@@ -35,8 +35,45 @@ class WordHistograms
   class WordGraph < Proc
     def self.new(*)
       super() do |io, hits, opts|  
-        binding.pry
-        io.puts "hello"
+        nodes = {} 
+        GraphViz::new( :G, :type => :digraph ) { |g|
+          add_row = lambda do |k,desc|
+            _str = ""
+            _str += "<TR>"
+            _str += "<TD>#{k}</TD>"
+            _str += "<TD>#{desc}</TD>"
+            _str += "</TR>"
+          end
+=begin        
+          str = ""
+          area.config.send(:hash).each do |k,(default,desc)|
+            str += add_option_row.call(k,default,desc)
+          end
+          a_node = g.send(:area, :label => (str.present? ? "<<TABLE>#{str}</TABLE>>" : "why wouldn't area have area options?"))
+=end        
+          for k, hit_count in hits 
+            nodes[k] = g.send(k.to_sym, shape: 'circle', color: 'red', label: "<<TABLE>#{add_row.call(k,hit_count)}</TABLE>>") #, bgcolor: 'red') 
+          end
+
+          {
+            "intelligent" => ["safety","efficiency","maintenance"],
+            "safety" => ["efficiency"],
+            "efficiency" => ["mobility"],
+            "elderly" => ["mobility"],
+            "congestion" => ["environment","efficiency"],
+            "regional" => ["efficiency","efficiency"],
+            "land use" => ["regional","walking","complete streets", "public transit","efficiency"],
+            "complete streets" => ["walking","public transit","multimodal"],
+            "public transit" => ["regional","multimodal"],
+            "multimodal" => ["congestion"]
+          }.each do |k,vs|
+            for v in vs
+              g.add_edges(nodes[k],nodes[v])
+            end
+          end
+        #}.output(:png => "output.png")
+        }.output(dot: "foo.dot")
+        io.puts "foo.dot generated"
       end
     end
   end
@@ -135,7 +172,7 @@ class WordHistograms
           error_master.details = [path, keyword]
           #error_master.verbose = lambda{ }
           if $cli_options["verbose"]
-            STDOUT.puts("#{path},#{keyword}, block_number #{block_number}, #{counts.values.inspect}")
+            STDOUT.puts("#{path},#{keyword}, block_number #{block_number}")
           end
           found = string.scan(/#{valid_variations.join("|")}/i)  #case insensitive
           if found.any?
@@ -165,7 +202,7 @@ class WordHistograms
     end
     nil
   rescue Exception => e
-    if ENV['DEBUG']
+    if $cli_options["debug"]
       binding.pry
     end
     STDERR.puts("Error: #{error_master.inspect}, #{e.message}")
