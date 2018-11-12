@@ -25,37 +25,61 @@ keywords:
     - conduit
     - sensor
     - device
+    - monitor
+    - visible
+    - visibility
+    - awareness
+    - traffic management
+    - traffic demand
+    - demand management
+
+  electric:
+    - electric
+    - ridehailing
+    - ridesharing
+    - shared
+    - advanced
+    - connected
+    - autonomous
+    - electric vehicle
+    - electrified
 
   maintenance:
     - maintenance
+    - maintain
+    - repair
+    - rehabilitate
+    - reconstruct
+    - retrofit
     - upkeep
+    - preserve
+    - preservation
 
   efficiency: 
     - efficiency
     - move
     - movement
+    
 
   mobility:
     - mobility
-    - immobile
-    - mobile
-
-  elderly: 
-    - elderly
-    - paratransit
-    - disabled
+    - access
     - rural
+
 
   environment:
     - environment
     - air quality
+    - clean air
+    
 
   congestion:
     - congestion
     - decongestion
+    - traffic
+    - carpool
 
-  regional:
-    - regional
+  connectivity:
     - connectivity
     - rapid transit
     - mass transit
@@ -63,32 +87,57 @@ keywords:
     - light rail
     - heavy rail
     - fixed
+    - local
+    - rail
+    - express
+    
 
   land use:
     - land use
     - density
     - planning
+    - tod
+    - transit-oriented
 
   walking:
     - walking
     - cycling
+    - biking
     - bike
-    - bike lanes
+    - pedestrian
+    - scooter
+    - e-bike
+    
 
   multimodal:
     - multimodal
+    - intermodal
+    - intermodal exchange
 
   public transit:
     - public transit
+    - mass transit
+    - access
+    - bus
+    - rail
+    - paratransit
+    
 
   complete streets:
     - complete streets
-    - turn-outs
+    - turn-out
     - curbs
     - curb side
-    - sidewalks
-    - medians
+    - sidewalk
+    - median
     - designated lane
+    - crosswalk
+    - pedestrian crossing
+    - beacon
+    - island
+    - curb cut
+    - curb extension
+    - audible
+    
 
-  access:
-    - access
+ 

@@ -10,11 +10,12 @@ require 'pry'
 require 'graphviz'
 require 'optparse'
 require 'hirb'
+srand(0)
 
-$cli_options = {"display" => 'WordGraph'} #.with_indifferent_access
+$cli_options = {"display" => 'PrintAll', "block-size"=>1000, "min-match-count"=>2} #.with_indifferent_access
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: bundle exec ruby word_histograms.rb [-v] [-o PrintAll|CompareNamesToConfig] path/to/file_with_pdf_links.txt keywords.yaml"
+  opts.banner = "Usage: bundle exec ruby word_histograms.rb [-v] [-o PrintAll|WordGraph] path/to/file_with_pdf_links.txt keywords.yaml"
 
   opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
     $cli_options["verbose"] = v
@@ -24,8 +25,16 @@ OptionParser.new do |opts|
     $cli_options["display"] = d
   end
 
+  opts.on("-m", "--min-match-count MIN_MATCH_COUNT", Integer, "min match count") do |m|
+    $cli_options["min-match-count"] = m
+  end
+
   opts.on("-C", "--config-path CONFIG_PATH", "yaml file path relative to root") do |c|
     $cli_options["config-path"] = c
+  end
+
+  opts.on("-b", "--block-size BLOCK_SIZE", Integer, "size of the text blocks tested for word variations") do |b|
+    $cli_options["block-size"] = b
   end
 end.parse!
 
@@ -35,14 +44,24 @@ class WordHistograms
   class WordGraph < Proc
     def self.new(*)
       super() do |io, hits, opts|  
+        output_filename = "#{$cli_options["block-size"]}.dot"
         nodes = {} 
-        GraphViz::new( :G, :type => :digraph ) { |g|
+        
+ 
+        GraphViz::new( :G, type: :digraph, rankdir: :LR ) { |g|
+          
           add_row = lambda do |k,desc|
             _str = ""
             _str += "<TR>"
             _str += "<TD>#{k}</TD>"
             _str += "<TD>#{desc}</TD>"
             _str += "</TR>"
+          end
+          ensure_node = lambda do |k,hit_count = 0, opts={}|
+            if hit_count.nil?
+              hit_count = hits[k]
+            end
+            nodes[k] ||= g.send(k.to_sym, opts.merge(label: "<<TABLE color='red'>#{add_row.call(k,hit_count)}</TABLE>>"))
           end
 =begin        
           str = ""
@@ -51,29 +70,42 @@ class WordHistograms
           end
           a_node = g.send(:area, :label => (str.present? ? "<<TABLE>#{str}</TABLE>>" : "why wouldn't area have area options?"))
 =end        
+
+          ensure_node.call("intelligent",nil,pos: "10,10")
+          ensure_node.call("safety",nil,pos: "100,100")
+          ensure_node.call("efficiency",nil,pos: "50,50")
+          ensure_node.call("connectivity",nil,pos: "10,10")
+          ensure_node.call("land use",nil,pos: "10,10")
+          ensure_node.call("congestion",nil,pos: "10,10")
+          ensure_node.call("complete streets",nil,pos: "10,10")
+          ensure_node.call("public transit",nil,pos: "10,10")
+          ensure_node.call("multimodal",nil,pos: "10,10")
+
+
           for k, hit_count in hits 
-            nodes[k] = g.send(k.to_sym, shape: 'circle', color: 'red', label: "<<TABLE>#{add_row.call(k,hit_count)}</TABLE>>") #, bgcolor: 'red') 
+            ensure_node.call(k) 
           end
 
           {
             "intelligent" => ["safety","efficiency","maintenance"],
             "safety" => ["efficiency"],
             "efficiency" => ["mobility"],
-            "elderly" => ["mobility"],
             "congestion" => ["environment","efficiency"],
-            "regional" => ["efficiency","efficiency"],
-            "land use" => ["regional","walking","complete streets", "public transit","efficiency"],
+            "connectivity" => ["efficiency","efficiency"],
+            "land use" => ["connectivity","walking","complete streets", "public transit","efficiency"],
             "complete streets" => ["walking","public transit","multimodal"],
-            "public transit" => ["regional","multimodal"],
+            "public transit" => ["connectivity","multimodal"],
             "multimodal" => ["congestion"]
           }.each do |k,vs|
+            ensure_node.call(k)
             for v in vs
+              ensure_node.call(v)
               g.add_edges(nodes[k],nodes[v])
             end
           end
         #}.output(:png => "output.png")
-        }.output(dot: "foo.dot")
-        io.puts "foo.dot generated"
+        }.output(dot: output_filename)
+        io.puts "#{output_filename} generated"
       end
     end
   end
@@ -83,12 +115,18 @@ class WordHistograms
       Hirb.enable :pager=>false, :formatter=>false 
 
       super() do |io, hits, opts|  
-        for k,count in hits
-          io.puts <<-END 
-              k:   #{k}
-          END
-          io.puts Hirb::Helpers::AutoTable.render([k,count],opts)
+        rows = hits.sort_by(&:last)
+
+        first_count = rows.first.last
+        rows.each do |row|
+          scale = row.last / (1.0*first_count)
+          row << scale.round
         end
+        io.puts Hirb::Helpers::AutoTable.render(rows,opts.merge(headers: ['category',"blocks (#{$cli_options['block-size']} min chars) which meet criteria", 'scale (relative)']))
+
+        option_and_value = $cli_options.dup
+        option_and_value.delete('display')
+        io.puts Hirb::Helpers::AutoTable.render(option_and_value.sort,headers: ["option","value"])
       end
     end
   end
@@ -101,6 +139,7 @@ class WordHistograms
 
     hsh = YAML.load_file(path_to_keywords)
     @keywords = hsh["keywords"]
+
     @document_rules = hsh["documents"]
 
     #validate keywords
@@ -161,24 +200,29 @@ class WordHistograms
       block_number += 1
 
       begin 
-        string += io.gets until (string.length > 1000 || io.eof?)
+        string += io.gets until (string.length > $cli_options["block-size"] || io.eof?)
       rescue
       end
 
       transaction_lite do |counts,error_master|
         for keyword, variations in @keywords
-          valid_variations = variations.reject{|v| @document_rules[path.basename.to_s] && Array(@document_rules[path.basename.to_s]['skip']).include?(v) }
+          valid_variations = variations.compact.reject{|v| @document_rules[path.basename.to_s] && Array(@document_rules[path.basename.to_s]['skip']).include?(v) }
 
           error_master.details = [path, keyword]
           #error_master.verbose = lambda{ }
           if $cli_options["verbose"]
             STDOUT.puts("#{path},#{keyword}, block_number #{block_number}")
           end
-          found = string.scan(/#{valid_variations.join("|")}/i)  #case insensitive
-          if found.any?
-            counts[keyword]
+          found = string.scan(/#{valid_variations.join("|")}/i).compact  #case insensitive
+          counts[keyword]
+          if $cli_options['min-match-count'] 
+            if found.length >= $cli_options['min-match-count']
+              counts[keyword] += found.length
+            end
+          elsif found.any?
             counts[keyword] += found.length
-            break
+          else
+            #binding.pry
           end
         end
 
